@@ -7,10 +7,10 @@
 #include "fs.h"
 
 // All active files in the fs
-File9 *files[Nfiles];
+File9 **files;
 
 // Commands log ;; 4 entries, 1024 wide
-char cmdlog[Ncmd][Cmdwidth];
+char **cmdlog;
 
 
 // Prototypes for 9p handler functions
@@ -24,15 +24,7 @@ static void		fsstat(Req *r);
 
 
 // Srv structure to handle incoming 9p communications
-static Srv srvfs =
-{
-	.attach		=	fsattach,
-	.read		=	fsread,
-	.write		=	fswrite,
-	.walk1		=	fswalk1,
-	.clone		= 	fsclone,
-	.stat		=	fsstat,
-};
+Srv *srvfs;
 
 
 // Usage output
@@ -72,9 +64,10 @@ void
 threadmain(int argc, char *argv[])
 {
 	char	*mnt, *srv;
+	int i;
 
-	srv = nil;
-	mnt = "/mnt/simplefs";
+	srv = "sfs";
+	mnt = nil;
 
 	ARGBEGIN{
 	case 'D':
@@ -95,6 +88,12 @@ threadmain(int argc, char *argv[])
 
 	/* The main thread will exit, so we need files on the heap ☺ */
 
+	cmdlog = calloc(Ncmd, sizeof (char*));
+	for(i = 0; i < Ncmd; i++)
+		cmdlog[i] = calloc(Cmdwidth, sizeof (char));
+
+	files = calloc(Nfiles, sizeof (File9*));
+
 	// Setup ctl file
 	File9 *ctl = calloc(1, sizeof (File9));
 	*ctl = (File9) { (Ref){ 0 }, 0, "ctl" };
@@ -105,7 +104,20 @@ threadmain(int argc, char *argv[])
 	*log = (File9) { (Ref){ 0 }, 1, "log" };
 	files[1] = log;
 
-	threadpostmountsrv(&srvfs, srv, mnt, MREPL|MCREATE);
+	srvfs = calloc(1, sizeof (Srv));
+	*srvfs = (Srv) {
+	.attach		=	fsattach,
+	.read		=	fsread,
+	.write		=	fswrite,
+	.walk1		=	fswalk1,
+	.clone		= 	fsclone,
+	.stat		=	fsstat,
+	};
+
+	// Start server
+
+	threadpostmountsrv(srvfs, srv, mnt, MREPL|MCREATE);
+
 	threadexits(nil);
 }
 

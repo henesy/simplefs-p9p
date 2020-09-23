@@ -11,4 +11,4 @@ struct File9 {
 };
 
 // All available files on the 9p fs
-extern File9 *files[Nfiles];
+extern File9 **files;
